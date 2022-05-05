@@ -22,6 +22,7 @@ with open("books.json", "r") as fopen, open("new_books.json", "a") as fopen1:
         if len(data["shelves"]) > 15:
             data["shelves"] = data["shelves"][:15]
         data["publication_date"] = int(data["publication_date"].split('-')[0])
+        data["id"] = int(data["id"])
         del data["work_id"]
         del data["isbn13"]
         del data["asin"]
@@ -39,30 +40,30 @@ with open("books.json", "r") as fopen, open("new_books.json", "a") as fopen1:
         fopen.__next__()
 
 print("NEW BOOKS JSON FINISHED")
-
-ind = 0
-with open("authors.json", "r") as fopen, open("new_authors.json", "a") as fopen1:
-    while fopen:
-        try:
-            if not ind % 10000:
-                print(ind)
-            if type(fopen.readline()) != str:
-                fopen.__next__()
-                continue
-            data = json.loads(fopen.readline())
-            if data["id"] in authors_present:
-                del data["ratings_count"]
-                del data["text_reviews_count"]
-                del data["work_ids"]
-                del data["image_url"]
-                del data["about"]
-                fopen1.write(json.dumps(data))
-                fopen1.write("\n")
-            fopen.__next__()
-            ind += 1
-        except Exception:
-            fopen.__next__()
-            ind += 1
-            continue
-
-print("NEW AUTHORS JSON FINISHED")
+#
+# ind = 0
+# with open("authors.json", "r") as fopen, open("new_authors.json", "a") as fopen1:
+#     while fopen:
+#         try:
+#             if not ind % 10000:
+#                 print(ind)
+#             if type(fopen.readline()) != str:
+#                 fopen.__next__()
+#                 continue
+#             data = json.loads(fopen.readline())
+#             if data["id"] in authors_present:
+#                 del data["ratings_count"]
+#                 del data["text_reviews_count"]
+#                 del data["work_ids"]
+#                 del data["image_url"]
+#                 del data["about"]
+#                 fopen1.write(json.dumps(data))
+#                 fopen1.write("\n")
+#             fopen.__next__()
+#             ind += 1
+#         except Exception:
+#             fopen.__next__()
+#             ind += 1
+#             continue
+#
+# print("NEW AUTHORS JSON FINISHED")
