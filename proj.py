@@ -1,6 +1,6 @@
 from pymongo import MongoClient
 
-HOST_IP = "44.202.48.208"
+HOST_IP = "44.204.195.90"
 HOST_PORT = "27017"
 
 author_id = None
@@ -13,7 +13,7 @@ def readRecord(books_collection, field_name, value):
 
 
 def getRating(books_collection, title):
-    rating = books_collection.find({"title", title})[0]["average_rating"]
+    rating = books_collection.find({"title": title})[0]["average_rating"]
     print(f'Rating is {rating}. The book is {"Good" if rating > 4 else ("Average" if rating > 3 else "Bad")}')
 
 
@@ -37,13 +37,16 @@ def findGreaterThan(books_collection, field_name, value):
 
 def insertBook(authors_collection, books_collection, title, author_name, isbn, language, average_rating, reviews, publication_date, format, publisher, description, num_pages):
     global book_id, author_id
-    author = authors_collection.find({"name": author_name})
-    author = author[0] if author else None
+    
+    author = None
+    for i in authors_collection.find({"name": author_name}).limit(1):
+        author = author["name"] if author else None
     if author:
-        books_collection.insert_one({"id": book_id, "title": title, "author_name": author_name, "author_id": author["id"], "isbn": isbn, "language": language, "average_rating": average_rating, "reviews": reviews, "publication_date": publication_date, "format": format, "publisher": publisher, "description": description, "num_pages": num_pages})
+        book_new = books_collection.insert_one({"id": book_id, "title": title, "author_name": author_name, "author_id": author["id"], "isbn": isbn, "language": language, "average_rating": average_rating, "reviews": reviews, "publication_date": publication_date, "format": format, "publisher": publisher, "description": description, "num_pages": num_pages})
+        import pdb; pdb.set_trace()
     else:
-        authors_collection.insert_one({"id": author_id, "name": author_name, "book_ids": [book_id]})
-        books_collection.insert_one({"id": book_id, "title": title, "author_name": author_name, "author_id": author_id, "isbn": isbn, "language": language, "average_rating": average_rating, "reviews": reviews, "publication_date": publication_date, "format": format, "publisher": publisher, "description": description, "num_pages": num_pages})
+        author_new = authors_collection.insert_one({"id": author_id, "name": author_name, "book_ids": [book_id]})
+        book_new = books_collection.insert_one({"id": book_id, "title": title, "author_name": author_name, "author_id": author_id, "isbn": isbn, "language": language, "average_rating": average_rating, "reviews": reviews, "publication_date": publication_date, "format": format, "publisher": publisher, "description": description, "num_pages": num_pages})
         author_id += 1
     book_id += 1
 
@@ -63,14 +66,8 @@ def updateDescription(books_collection, description, id):
     books_collection.update_one({"id": id}, {"$set": {"description": description}})
 
 
-def deleteRecord(authors_collection, books_collection, id):
-    results = books_collection.delete_one({"id": id})
-    authors_collection.update_many({}, {"$pull": {"book_ids": id}})
-    print("Completed delete")
-
-
 def deleteAuthor(authors_collection, books_collection, name):
-    authors_collection._delete({"name": name})
+    authors_collection.delete({"name": name})
     books_collection.delete_many({"author_name": name})
     print(f"Deleted author - {name}")
 
@@ -85,6 +82,7 @@ def deleteTitle(authors_collection, books_collection, title):
 
 
 def main():
+    global book_id, author_id
     flag = True
     operation = None
 
@@ -94,15 +92,19 @@ def main():
     db = client["project"]
     authors_collection = db["authors"]
     books_collection = db["books"]
+    print("Connected to",HOST_IP+":"+HOST_PORT+" successfully!")
+    book_id = books_collection.find().sort("id", -1).limit(1)[0]["id"] + 1
+    author_id = books_collection.find().sort("id", -1).limit(1)[0]["id"] + 1
+    print(f"The last author id is {author_id} and the last book id is {book_id}")
 
     while flag:    
-        print("1. Query by book name\n 2. Query by author name\n3. Query based on format\n4. Query based on the publisher\n5. Query the rating for a particular title\n6. Query the shelves for a particular title\n7. Find books having less than a certain number of pages\n8. Find books published after a certain year\n9. Find books with an average rating above a certain number\n10. Insert a data entry\n11. Insert an author\n12. Update the Format for a particular title\n13. Update the description for a particular title\n14. Delete an author, delete all associated books with it\n15. Delete a book and remove that book id from all the authors\nEnter any other number to exit")
+        print("1. Query by book name\n 2. Query by author name\n3. Query based on format\n4. Query based on the publisher\n5. Query the rating for a particular title\n6. Query the shelves for a particular title\n7. Find books having less than a certain number of pages\n8. Find books published after a certain year\n9. Find books with an average rating above a certain number\n10. Insert a data entry\n11. Insert an author\n12. Update the Format for a particular title\n13. Update the description for a particular title\n14. Delete an author, delete all associated books with it\n15. Delete a book and remove that book id from all the authors\n16. Exit")
         operation = int(input())
         match operation:
             case 1:
                 print("Enter book title -")
                 book_title = input()
-                readRecord(books_collection, "book_title", book_title)
+                readRecord(books_collection, "title", book_title)
             case 2:
                 print("Enter an author name -")
                 author_name = input()
@@ -133,8 +135,8 @@ def main():
                 findGreaterThan(books_collection, "publication_date", year)
             case 9:
                 print("Enter the rating you want books to be greater than")
-                rating = int(input())
-                findGreaterThan(books_collection, "rating", rating)
+                rating = float(input())
+                findGreaterThan(books_collection, "average_rating", rating)
             case 10:
                 print("Enter title")
                 title = input()
@@ -145,16 +147,16 @@ def main():
                 print("Enter the language the book is written in")
                 language = input()
                 print("Enter the average rating the book has")
-                average_rating = int(input())
+                average_rating = float(input())
                 print("Enter the number of reviews the book has")
                 reviews = int(input())
                 print("The publication year")
-                publication_date = input()
+                publication_date = int(input())
                 print("Enter the format the book is in")
                 format = input()
                 print("Enter the name of the publisher")
                 publisher = input()
-                print("Enter the description of hte book")
+                print("Enter the description of the book")
                 description = input()
                 print("Enter the number of pages the book has")
                 num_pages = int(input())
