@@ -1,15 +1,21 @@
+import certifi
 from pymongo import MongoClient
 
-HOST_IP = "44.204.195.90"
+HOST_IP = "34.227.20.229"
 HOST_PORT = "27017"
 
 author_id = None
 book_id = None
 
+
 def readRecord(books_collection, field_name, value):
     books = books_collection.find({field_name: value})[:10]
+    # print(len(list(books)) == 0)
+    # if len(list(books)) > 0:
     for book in books:
-        print(f'Book -> {book["title"]}, Author -> {book["author_name"]}, Year -> {book["publication_date"]}, Rating -> {book["average_rating"]}')
+        print(f'Book: {book["title"]}, Author: {book["author_name"]}, ID: {book["id"]}, Year: {book["publication_date"]}, Rating: {book["average_rating"]}, Publisher: {book["publisher"]}, Pages: {book["num_pages"]}')
+    # else:
+    #     print(f"{value} does not exist!")
 
 
 def getRating(books_collection, title):
@@ -20,19 +26,19 @@ def getRating(books_collection, title):
 def findLocation(books_collection, title):
     shelves = books_collection.find({"title": title})[0]["shelves"]
     shelves = [shelf["name"] for shelf in shelves]
-    print(f'The book is in the following shelves {shelves}')
+    print(f'The book is in the following shelves:\n{shelves}')
 
 
 def findLessThan(books_collection, field_name, value):
     books = books_collection.find({field_name: {"$lt": value}})[:10]
     for book in books:
-        print(f'Book -> {book["title"]}, Author -> {book["author_name"]}, Year -> {book["publication_date"]}, Rating -> {book["average_rating"]}')
+        print(f'Book -> {book["title"]}, Author -> {book["author_name"]}, Year -> {book["publication_date"]}, Rating -> {book["average_rating"]}, Pages: {book["num_pages"]}')
 
 
 def findGreaterThan(books_collection, field_name, value):
     books = books_collection.find({field_name: {"$gte": value}})[:10]
     for book in books:
-        print(f'Book -> {book["title"]}, Author -> {book["author_name"]}, Year -> {book["publication_date"]}, Rating -> {book["average_rating"]}')
+        print(f'Book -> {book["title"]}, Author -> {book["author_name"]}, Year -> {book["publication_date"]}, Rating -> {book["average_rating"]}, Pages: {book["num_pages"]}')
 
 
 def insertBook(authors_collection, books_collection, title, author_name, isbn, language, average_rating, reviews, publication_date, format, publisher, description, num_pages):
@@ -67,19 +73,48 @@ def updateDescription(books_collection, description, id):
 
 
 def deleteAuthor(authors_collection, books_collection, name):
-    authors_collection.delete({"name": name})
+    author_id = getAuthorId(authors_collection, name)
+    authors_collection.delete_one({"id": author_id})
     books_collection.delete_many({"author_name": name})
-    print(f"Deleted author - {name}")
+    print(f"Deleted author - {name} and all books written by them")
 
 
 def deleteTitle(authors_collection, books_collection, title):
     book_id = None
     for d in books_collection.find({"title": title}).limit(1):
         book_id = d["id"]
-    books_collection.delete_one({"title": title})
+        print(f"Book ID: {book_id}")
+        author_name = d["author_name"]
+
+    authors = authors_collection.find({"name": author_name})
+    for author in authors:
+        print(f"Before: {author['name']}'s IDs of books: {author['book_ids']}")
+    books_collection.delete_one({"id": book_id})
     authors_collection.update_many({}, {"$pull": {"book_ids": book_id}})
     print(f"Deleted title - {title}")
+    authors = authors_collection.find({"name": author_name})
+    for author in authors:
+        print(f"After: {author['name']}'s IDs of books: {author['book_ids']}")
 
+
+def famousAuthors(authors_collection):
+    authors = authors_collection.aggregate([{"$sort": {"fans_count": -1}}, {"$limit": 10}])
+    for author in authors:
+        print(
+            f'ID -> {author["id"]}, Name -> {author["name"]}, Rating -> {author["average_rating"]}, Fans -> {author["fans_count"]}')
+
+
+def getAuthorId(authors_collection, name):
+    authors = authors_collection.find({"name": name})[:10]
+    for author in authors:
+        # print(f"Author: {author['name']}, ID: {author['id']}")
+        return author['id']
+
+def getBooksId(books_collection, author):
+    books = books_collection.find({"author_name": author})[:10]
+    for book in books:
+        # print(f"Title: {book['title']}, ID: {book['id']}")
+        return book["id"]
 
 def main():
     global book_id, author_id
@@ -87,18 +122,24 @@ def main():
     operation = None
 
     uri = "mongodb://"+HOST_IP+":"+HOST_PORT
+    # client = MongoClient(
+    #     "mongodb+srv://billy:M2uwMlTFDS0ugrov@cluster0.jgdpz.mongodb.net/final?retryWrites=true&w=majority",
+    #     tlsCAFile=certifi.where())
 
+    # db = client["final"]
+    # books_collection = db["books"]
+    # authors_collection = db["authors"]
     client = MongoClient(uri)
     db = client["project"]
     authors_collection = db["authors"]
     books_collection = db["books"]
-    print("Connected to",HOST_IP+":"+HOST_PORT+" successfully!")
+    print("Connected to", HOST_IP + ":" + HOST_PORT + " successfully!")
     book_id = books_collection.find().sort("id", -1).limit(1)[0]["id"] + 1
     author_id = books_collection.find().sort("id", -1).limit(1)[0]["id"] + 1
     print(f"The last author id is {author_id} and the last book id is {book_id}")
 
-    while flag:    
-        print("1. Query by book name\n 2. Query by author name\n3. Query based on format\n4. Query based on the publisher\n5. Query the rating for a particular title\n6. Query the shelves for a particular title\n7. Find books having less than a certain number of pages\n8. Find books published after a certain year\n9. Find books with an average rating above a certain number\n10. Insert a data entry\n11. Insert an author\n12. Update the Format for a particular title\n13. Update the description for a particular title\n14. Delete an author, delete all associated books with it\n15. Delete a book and remove that book id from all the authors\n16. Exit")
+    while flag:
+        print("1. Query by book name\n2. Query by author name\n3. Query based on format\n4. Query based on the publisher\n5. Query the rating for a particular title\n6. Query the shelves for a particular title\n7. Find books having less than a certain number of pages\n8. Find books published after a certain year\n9. Find books with an average rating above a certain number\n10. Insert a data entry\n11. Insert an author\n12. Update the Format for a particular title\n13. Update the description for a particular title\n14. Delete an author, delete all associated books with it\n15. Delete a book and remove that book id from all the authors\n16. Find top 10 authors with the most fans\n17. Exit")
         operation = int(input())
         match operation:
             case 1:
@@ -189,17 +230,13 @@ def main():
                 print("Enter the title to delete")
                 title = input()
                 deleteTitle(authors_collection, books_collection, title)
+            case 16:
+                print("The top 10 most famous authors based on their fan counts are ")
+                famousAuthors(authors_collection)
             case _:
                 flag = False
     print("Operations Completed")
 
 
-
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
